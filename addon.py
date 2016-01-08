@@ -661,13 +661,21 @@ def playSerbiaPlusStream(url):
 		return False
 
 def serbiaplussearchurl(intext):
-	stream = []
+	streams = []
+	streams = searchstreams(intext)
+	if streams != []:
+		return HTMLParser.HTMLParser().unescape(streams[0])
+	else:
+		return ''
+
+def searchstreams(intext):
+	streams = []
 	if intext.find("file: \"") != -1 or intext.find("file:\"") != -1:
-		stream=re.compile('file:.*?"(.+?)"').findall(intext)
+		streams += re.compile('file:.*?"(.+?)"').findall(intext)
 	if intext.find("\"file\"") != -1:
-		stream=re.compile(', *?"file":"(.+?)"').findall(intext)
+		streams += re.compile(', *?"file":"(.+?)"').findall(intext)
 	if intext.find("'file':") != -1:
-		stream=re.compile("'file' *?: *?'(.+?)'").findall(intext)
+		streams += re.compile("'file' *?: *?'(.+?)'").findall(intext)
 	if intext.find("application/x-vlc-plugin") != -1 or intext.find("application/x-google-vlc-plugin") != -1:
 		start = intext.find("application/x-vlc-plugin")
 		if start == -1:
@@ -678,22 +686,26 @@ def serbiaplussearchurl(intext):
 		else:
 			start = 0
 
-		stream=re.compile('target="(.+?)"').findall(intext, start)
+		streams += re.compile('target="(.+?)"').findall(intext, start)
 	if intext.find("streamer=rtmp://") != -1:
 		tmp=re.compile('file=(.+?)&streamer=(.+?)&').findall(intext)
 		if tmp != []:
-			stream = [tmp[0][1]+tmp[0][0]]
+			streams += [tmp[0][1]+tmp[0][0]]
 	if intext.find('flashvars="src') != -1 or intext.find('flashvars="streamer') != -1:
 		tmp=re.compile('flashvars=".+?=(.+?)"').findall(intext)
 		if tmp != []:
-			stream=[urllib.unquote_plus(tmp[0]).strip()]
+			streams += [urllib.unquote_plus(tmp[0]).strip()]
 			stream[0]=stream[0].split(' ')[0]
 			stream[0]=stream[0].split('&')[0]
 
-	if stream != []:
-		return HTMLParser.HTMLParser().unescape(stream[0])
-	else:
-		return ''
+	newstreams = []
+	for stream in streams:
+		trimmedstream = stream
+		trimmedstream = trimmedstream.split(' ')[0]
+		trimmedstream = trimmedstream.split('&')[0]
+		newstreams += [trimmedstream]
+
+	return newstreams
 
 def decode_serbiaplus_frame(s, splitconst, appendconst, offsetconst):
 	r = ""
@@ -877,7 +889,8 @@ def listNetrajaTvs(url):
 
 	return {}
 
-def playNetrajaStream(url):
+
+def listNetrajaStreams(url):
 	pDialog = xbmcgui.DialogProgress()
 	pDialog.create('Netraja', 'Initializing')
 	req = urllib2.Request(url)
@@ -889,23 +902,17 @@ def playNetrajaStream(url):
 	start = link.find("<div class='post-body entry-content'")
 	end = link.find("<div style='clear: both;'></div>", start)
 
-	stream=serbiaplussearchurl(link[start:end])
+	streams = []
 
-	if stream == '':
+	streams = searchstreams(link[start:end])
+
+	if streams == []:
 		if link[start:end].find("www.youtube.com/embed/") != -1:
 			match=re.compile('www.youtube.com/embed/(.+?)"').findall(link[start:end])
 			if match != []:
-				stream='plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid='+match[0]
+				streams=['plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid='+match[0]]
 
-	if stream != '':
-		if stream.__contains__('youtube.com'):
-			stream = 'plugin://plugin.video.youtube/?path=/root/video&action=play_video&videoid='+stream.split('=')[-1].strip()
-
-		pDialog.update(80, 'Playing')
-		playurl(stream)
-
-	pDialog.close()
-	return True
+	return streams
 
 # rts methods
 
@@ -1357,8 +1364,17 @@ def PROCESS_PAGE(page,url='',name=''):
 	elif page == 'netraja_list_tvs':
 		listing = listNetrajaTvs(url)
 		for item in listing:
-			addLink(item['link'][-1]['title'].encode('ascii', 'ignore'), item['link'][-1]['href'], 'netraja_play_stream', item.values()[7].values()[0] )
+			addDir(item['link'][-1]['title'].encode('ascii', 'ignore'), 'netraja_list_streams', item['link'][-1]['href'], item.values()[7].values()[0] )
 		xbmc.executebuiltin("Container.SetViewMode(500)")
+		setView()
+		xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+	elif page == 'netraja_list_streams':
+		listing = listNetrajaStreams(url)
+		streamcnt = 1
+		for stream in listing:
+			addLink("Stream"+str(streamcnt), stream, '', '')
+			streamcnt = streamcnt + 1
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
