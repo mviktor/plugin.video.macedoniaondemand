@@ -1,3 +1,7 @@
+v2.1
+   - [netraja] fix in netraja section
+   - [tvnovamk] tv nova mk added
+
 v2.0
    - [24vesti.mk] trim youtube and dailymotion links
    - [hrt] fix for hrt
