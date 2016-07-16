@@ -1213,13 +1213,8 @@ def playurl(url):
 
 	if url[:4] == 'rtmp':
 		url = url + ' timeout=10'
-
-	listitem = xbmcgui.ListItem(guititle)
-	play=xbmc.PlayList(xbmc.PLAYLIST_VIDEO)
-	play.clear()
-	play.add(url, listitem)
-	player = xbmc.Player(xbmc.PLAYER_CORE_AUTO)
-	player.play(play)
+	listitem = xbmcgui.ListItem(path=url)
+	xbmcplugin.setResolvedUrl(int(sys.argv[1]), True, listitem)
 	return True
 
 def playGenericChannel(url):
@@ -1780,7 +1775,7 @@ def addLink(name,url,page,iconimage,fanart='',duration='00:00', published='0000-
 	if description != '':
 		liz.setInfo('video', { 'plot':description })
 
-	#liz.setProperty('IsPlayable', 'false')
+	liz.setProperty('IsPlayable', 'true')
 	if fanart!='':
 		liz.setProperty('fanart_image', fanart)
         ok=xbmcplugin.addDirectoryItem(handle=int(sys.argv[1]),url=u,listitem=liz)
