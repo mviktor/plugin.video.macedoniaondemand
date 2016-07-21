@@ -1,3 +1,6 @@
+v2.2
+   - [mrt] support reworked version of play.mrt.com.mk web
+
 v2.1
    - [netraja] fix in netraja section
    - [tvnovamk] tv nova mk added

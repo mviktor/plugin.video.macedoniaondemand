@@ -455,7 +455,9 @@ def createmrtfrontList():
 	response = urllib2.urlopen(req)
 	link=response.read()
 	response.close()
-	match=re.compile('<li class="">\n        <a href="(.+?)">\n            (.+?)        </a>\t\n    </li>').findall(link)
+	start=link.find('<ul class="nav navbar-nav">')
+	end=link.find('<li class="dropdown">', start)
+	match=re.compile('<li class=""><a href="(.+?)">(.+?)</a></li>').findall(link, start, end)
 	return match
 
 def duration_in_minutes(duration):
@@ -465,33 +467,44 @@ def duration_in_minutes(duration):
 		minutes = minutes*60 + int(split_duration[i])
 	return minutes
 
-def list_mrtchannel(url):
-	url = 'http://play.mrt.com.mk'+url
+def list_mrtvideos(url1, url2, pagenr):
+	url=url1+pagenr+url2+'/0'
+	req = urllib2.Request(url)
+	req.add_header('User-Agent', user_agent)
+	response = urllib2.urlopen(req)
+	data = json.load(response)
+	response.close()
+	nrpages = data['page_count']
+	nextpage = {}
+	if int(nrpages) > int(pagenr):
+		nextpage = {"url1":url1,"url2":url2,"pagenr":str(int(pagenr)+1)}
+	match = re.compile('<a href="(.+?)">.+?<img src="(.+?)".+?<div class="desc">(.+?)</div>').findall(data['page_html'].encode('utf-8'))
+	return [nextpage, match]
+
+def list_mrtcategories(url):
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', user_agent)
 	response = urllib2.urlopen(req)
 	link=response.read()
 	response.close()
 	list=[]
-	match=re.compile('<div class="col-xs-6 col-sm-3 (.+?) content">\n.+?<a href="(.+?)".+?\n.+?<img src="(.+?)".+?\n.+?\n.+?<span class="title gradient">(.+?)</span>').findall(link)
 
-	# extract channels
-	for type,url,thumb,title in match:
-		list.append([type,url,thumb,'',title])
+	match=re.compile('<div class="col-xs-6 col-sm-3"><a href="(.+?)">.+?<img src="(.+?)" .+?<div class="desc category">(.+?)</div>').findall(link)
 
-	match=re.compile('<div class="col-xs-6 col-sm-3 (.+?) content">\n.+?<a href="(.+?)".+?\n.+?<img src="(.+?)".+?\n.+?\n.+?<span class="duration">(.+?)</span>\n.+?<span class="title gradient">(.+?)</span>').findall(link)
+	# extract categories
+	for url, thumb, title in match:
+		list.append(["category", url, thumb, '', title])
 
-	# extract latest videos on current channel
-	for type,url,thumb,duration,title in match:
-		list.append([type,url,thumb,str(duration_in_minutes(duration)),title])
+	#extract videos in this category
 
-	nextpage=''
-	nextpagestart = link.find('class="next"')
-	if nextpagestart != -1:
-		nextpageend = link.find('</div>', nextpagestart)
-		nextpagematch = re.compile("url:'(.+?)'").findall(link, nextpagestart, nextpageend)
-		if nextpagematch != []:
-			nextpage = nextpagematch[0]
+	match=re.compile("var txPageVideosUrl = '(.+?)'\+pxPageNum\+'(.+?)'").findall(link)
+
+	if match == []:
+		return [list, []]
+
+	[nextpage,videos] = list_mrtvideos(match[0][0], match[0][1], '1')
+	for url, thumb, title in videos:
+		list.append(["video", url, thumb, '', title])
 
 	return [list, nextpage]
 
@@ -504,45 +517,24 @@ def list_mrtlive():
 	response.close()
 	start=link.find('<ul class="dropdown-menu text-left')
 	end=link.find('</ul', start)
-	match=re.compile('<a class="channel" href=".+?" data-href="(.+?)" .+? title="(.+?)">\n.*?<img src="(.+?)"').findall(link[start:end])
+	match=re.compile('<a class="channel" href="(.+?)" data-href="#" data-url="#" title="(.+?)"><img src="(.+?)"></a>').findall(link[start:end])
 	return match
 
 def playmrtvideo(url):
-	pDialog = xbmcgui.DialogProgress()
-	pDialog.create('MRT Play live stream', 'Initializing')
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', user_agent)
-	pDialog.update(50, 'Fetching video stream')
 	response = urllib2.urlopen(req)
 	link = response.read()
 	response.close()
 
-	match2=re.compile('"playlist":\[{"url":"(.+?)"').findall(link)
-	match1 = re.compile('"baseUrl":"(.+?)"').findall(link)
+	match = re.compile('<source src="(.+?)" ').findall(link)
+	if match != []:
+		if match[0][:4] == 'http':
+			playurl(match[0])
+		if match[0][:4] == 'rtmp':
+			url=match[0]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
+			playurl(url)
 
-	title = re.compile('<meta property="og:title" content="(.+?)"').findall(link)
-
-	if match2 != [] and match1 != []:
-		stream=match1[0]+"/"+match2[0]
-		stream=stream[:stream.rfind('/')]+'/master.m3u8'
-		if title != []:
-			videotitle = title[0]
-		else:
-			videotitle = 'MRT Video'
-		pDialog.update(70, 'Playing')
-		playurl(stream)
-		pDialog.close()
-	elif match2 != []:
-		stream=match2[0]
-		if title != []:
-			videotitle = title[0]
-		else:
-			videotitle = 'MRT Video'
-		pDialog.update(70, 'Playing')
-		playurl(stream)
-		pDialog.close()
-
-	return True
 
 #  OTHER live streams methods
 
@@ -1513,7 +1505,7 @@ def PROCESS_PAGE(page,url='',name=''):
 	elif page == "mrt_front":
 		listing = createmrtfrontList()
 		for url,channel in listing:
-			addDir(channel, 'list_mrtchannel', url, '')
+			addDir(channel, 'list_mrtcategories', url, '')
 		addDir('ВО ЖИВО', 'list_mrtlive', '', '')
 
 		setView()
@@ -1527,17 +1519,33 @@ def PROCESS_PAGE(page,url='',name=''):
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
-	elif page == 'list_mrtchannel':
-		[listing, nextpage] = list_mrtchannel(url)
+	elif page == 'list_mrtcategories':
+		[listing, nextpage] = list_mrtcategories(url)
 
 		for type,url,thumb,duration,title in listing:
 			if type=="video":
 				addLink(title, url, 'play_mrt_video', thumb, '', duration)
-			elif type=="channel":
-				addDir(">>  "+title, 'list_mrtchannel', url, thumb)
+			elif type=="category":
+				addDir(">>  "+title, 'list_mrtcategories', url, thumb)
 
-		if nextpage != '':
-			addDir(">> Следна Страна", 'list_mrtchannel', nextpage.replace('&amp;', '&'), '')
+		if nextpage != {}:
+			print "nextpage="+str(nextpage)
+			addDir(">> Следна Страна", 'list_mrtvvideos', json.dumps(nextpage), '')
+
+		setView()
+		xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+	elif page == 'list_mrtvvideos':
+		data=json.loads(url)
+
+		[nextpage,videos] = list_mrtvideos(data['url1'], data['url2'], data['pagenr'])
+
+		for videourl, thumb, title in videos:
+			addLink(title, videourl, 'play_mrt_video', thumb, '', '')
+
+		if nextpage != {}:
+			print "nextpage="+str(nextpage)
+			addDir(">> Следна Страна", 'list_mrtvvideos', json.dumps(nextpage), '')
 
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
@@ -1832,4 +1840,3 @@ except:
 
 if result:
 	PROCESS_PAGE(page, url, name)
-
