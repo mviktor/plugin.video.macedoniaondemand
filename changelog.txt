@@ -1,3 +1,6 @@
+v3.0
+   - support for running via proxy
+
 v2.2
    - [mrt] support reworked version of play.mrt.com.mk web
 

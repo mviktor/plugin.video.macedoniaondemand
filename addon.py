@@ -12,7 +12,7 @@ import sys,os,os.path
 user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux i686; rv:11.0) Gecko/20100101 Firefox/11.0'
 str_accept = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
 
-ADDON=__settings__ = xbmcaddon.Addon(id='plugin.video.macedoniaondemand')
+ADDON=__settings__ = xbmcaddon.Addon(id='plugin.video.macedoniaondemand-proxy')
 DIR_USERDATA = xbmc.translatePath(ADDON.getAddonInfo('profile'))
 VERSION_FILE = DIR_USERDATA+'version.txt'
 VISITOR_FILE = DIR_USERDATA+'visitor.txt'
@@ -128,7 +128,14 @@ def createZuluListing():
 	#	print station, thumb
 	return match
 
-def playZuluStream(url):
+def playZuluStream(url, useproxy):
+
+	if useproxy == True:
+		if checkIsProxyEnabled() == False:
+			xbmcgui.Dialog().ok('Failed', 'Your account or IP address is not active in the proxy.',
+			'Visit http://macedoniaondemand.com from any device on same network to activate it.', 'No need to change any setting!')
+			return
+
 	pDialog = xbmcgui.DialogProgress()
 	pDialog.create('Zulu Stream', 'Initializing')
 	pDialog.update(30, 'Fetching video stream')
@@ -139,7 +146,14 @@ def playZuluStream(url):
 	response.close()
 	nextframe = re.compile('<iframe src="(.+?)"').findall(link)
 	pDialog.update(60, 'Fetching video stream')
-	req = urllib2.Request('http://on.net.mk/'+nextframe[0])
+	if useproxy == True:
+		servername	= 'macedoniaondemand.com'
+		hostname	= 'on.net.mk'
+	else:
+		servername	= 'on.net.mk'
+		hostname	= 'on.net.mk'
+	req = urllib2.Request('http://'+servername+'/'+nextframe[0])
+	req.add_header('Host', hostname)
 	req.add_header('User-Agent', user_agent)
 	response = urllib2.urlopen(req)
 	link = response.read()
@@ -150,6 +164,41 @@ def playZuluStream(url):
 	playurl(streammatch[0])
 
 	return True
+
+# Proxy methods
+
+def checkIsProxyEnabled():
+	result = False
+	url = 'http://macedoniaondemand.com/proxy_status.php'
+	try:
+		req = urllib2.Request(url)
+		req.add_header('Host', 'proxytest.macedoniaondemand.com')
+		req.add_header('User-Agent', user_agent)
+		req.add_header('Accept', str_accept)
+		response = urllib2.urlopen(req)
+		data=response.read()
+		response.close()
+		if data.__contains__('OK'):
+			result = True
+	except:
+		result = False
+
+	return result
+
+# WEB MAXTV methods
+
+def createWebmaxtvListing():
+	url='http://macedoniaondemand.com/xml/channels1.xml'
+	req = urllib2.Request(url)
+	req.add_header('Host', 'web.maxtv.mk')
+	req.add_header('User-Agent', user_agent)
+	response = urllib2.urlopen(req)
+	link=response.read()
+	response.close()
+	match=re.compile('<c id=".+?" c="(.+?)" path="rtmp://(.+?)/(.+?)" pathBck=".+?" logo="(.+?)"').findall(link)
+	#for name, server, u, thumb in match:
+	#	print name, server, u, thumb
+	return match
 
 # TELEKABEL live
 
@@ -1212,7 +1261,6 @@ def playurl(url):
 def playGenericChannel(url):
 	pDialog = xbmcgui.DialogProgress()
 	pDialog.create('Macedonia On Demand', 'Initializing')
-
 	pDialog.update(50, 'Finding stream')
 	try:
 		content=readurl(url)
@@ -1250,6 +1298,7 @@ def PROCESS_PAGE(page,url='',name=''):
 	if page == None:
 		addDir('Телевизија', 'tv_front', '', '')
 		addDir('Радио', 'liveradio_front', '', '')
+		addDir('Телевизија преку прокси', 'tv_proxy_front', '', '')
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -1312,8 +1361,15 @@ def PROCESS_PAGE(page,url='',name=''):
 		#addDir('serbiaplus (beta)', 'serbiaplus_front', '', '')
 		addDir('netraja.net (beta)', 'netraja_front', '', 'http://3.bp.blogspot.com/-_z6ksp3rY6Q/U0HL30rMwaI/AAAAAAAADAs/_hSEFNwNZ_8/s1600/7.png')
 		#addDir('tvboxuzivo (beta)', 'tvboxuzivo_front', '', '')
-		addDir('ТВ НОВА - Македонија', 'tvnovamk_live', '', 'http://tvnova.mk/images/logo.png')
+		addLink('ТВ НОВА - Македонија', 'tvnovamk_live', 'tvnovamk_live', 'http://tvnova.mk/images/logo.png')
 		addDir('останати...', 'live_other', '', '')
+		setView()
+		xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+	elif page == 'tv_proxy_front':
+		addDir('zulu', 'live_zulumk_proxy', '', '')
+		if checkIsProxyEnabled():
+			addDir('maxtv', 'live_maxtv_proxy', '', '')
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -1369,19 +1425,43 @@ def PROCESS_PAGE(page,url='',name=''):
 	elif page == 'netraja_play_stream':
 		playNetrajaStream(url)
 
-	elif page == 'live_zulumk':
+	elif page.__contains__('live_zulumk'):
 		listing = createZuluListing()
 		#for station, thumb in match:
 		#	print station, thumb
+		if page == 'live_zulumk':
+			nextpage = 'playzulustream'
+		else:
+			nextpage = 'playzulustreamproxy'
+
 		for station, thumb in listing:
-			addLink(station.split('/')[-1], station, 'playzulustream', 'http://on.net.mk/'+thumb)
+			addLink(station.split('/')[-1], station, nextpage, 'http://on.net.mk/'+thumb)
 		setView('files', 500)
 		xbmc.executebuiltin("Container.SetViewMode(500)")
-
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
+		if nextpage == 'playzulustreamproxy' and checkIsProxyEnabled() == False:
+			xbmcgui.Dialog().ok('Failed', 'Your account or IP address is not active in the proxy.',
+			'Visit http://macedoniaondemand.com from any device on same network to activate it.', 'No need to change any setting!')
+
+
 	elif page=='playzulustream':
-		playZuluStream(url)
+		playZuluStream(url, False)
+
+	elif page=='playzulustreamproxy':
+		playZuluStream(url, True)
+
+	elif page == 'live_maxtv_proxy':
+		if checkIsProxyEnabled() == False:
+			xbmcgui.Dialog().ok('Failed', 'Your account or IP address is not active in the proxy.',
+			'Visit http://macedoniaondemand.com from any device on same network to activate it.', 'No need to change any setting!')
+		else:
+			listing = createWebmaxtvListing()
+			for title, server, u, thumb in listing:
+				addLink(title, 'rtmp://'+server+'/'+u+' app='+u+' pageUrl=http://web.maxtv.mk/ swfUrl=http://web.maxtv.mk/maxTv14.swf  live=true playpath=stream2 swfVfy=true timeout=5', '', 'http://web.maxtv.mk/'+thumb)
+			setView('files', 500)
+			xbmc.executebuiltin("Container.SetViewMode(500)")
+			xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 	elif page == 'live_telekabelmk':
 		listing = createTelekabelListing()
