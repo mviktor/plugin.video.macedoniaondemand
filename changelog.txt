@@ -1,3 +1,6 @@
+v2.3
+   - [tvnova] fix for tvnova.mk
+
 v2.2
    - [mrt] support reworked version of play.mrt.com.mk web
 
