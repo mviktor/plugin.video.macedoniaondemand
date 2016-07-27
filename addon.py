@@ -527,12 +527,12 @@ def playmrtvideo(url):
 	link = response.read()
 	response.close()
 
-	match = re.compile('<source src="(.+?)" ').findall(link)
+	match = re.compile("<source src=('|\")(http|rtmp)://(.+?)(:[0-9]+?|)/(.+?)('|\") ").findall(link)
 	if match != []:
-		if match[0][:4] == 'http':
-			playurl(match[0])
-		if match[0][:4] == 'rtmp':
-			url=match[0]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
+		if match[0][1] == 'http':
+			playurl(match[0][1]+'://'+match[0][2]+match[0][3]+'/'+match[0][4])
+		if match[0][1] == 'rtmp':
+			url=match[0][1]+'://'+match[0][2]+match[0][3]+'/'+match[0][4]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
 			playurl(url)
 
 
