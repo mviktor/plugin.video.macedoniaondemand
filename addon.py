@@ -569,19 +569,34 @@ def list_mrtlive():
 	match=re.compile('<a class="channel" href="(.+?)" data-href="#" data-url="#" title="(.+?)"><img src="(.+?)"></a>').findall(link[start:end])
 	return match
 
-def playmrtvideo(url):
+def playmrtvideo(url, useproxy):
+
+	if useproxy == True:
+		if checkIsProxyEnabled() == False:
+			xbmcgui.Dialog().ok('Failed', 'Your account or IP address is not active in the proxy.',
+			'Visit http://macedoniaondemand.com from any device on same network to activate it.', 'No need to change any setting!')
+			return
+
 	req = urllib2.Request(url)
 	req.add_header('User-Agent', user_agent)
 	response = urllib2.urlopen(req)
 	link = response.read()
 	response.close()
 
-	match = re.compile('<source src="(.+?)" ').findall(link)
+
+	match = re.compile('<source src=("|\')(http|rtmp)://(.+?)(:[0-9]+?|)/(.+?)("|\') ').findall(link)
 	if match != []:
-		if match[0][:4] == 'http':
-			playurl(match[0])
-		if match[0][:4] == 'rtmp':
-			url=match[0]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
+		if match[0][1] == 'http':
+			#playurl(match[0][1]+'://'+match[0][2]+match[0][3]+'/'+match[0][4])
+			if useproxy == True:
+				playurl(match[0][1]+'://macedoniaondemand.com/'+match[0][4]+'|Host='+match[0][2]+match[0][3])
+			else:
+				playurl(match[0][1]+'://'+match[0][2]+match[0][3]+'/'+match[0][4]+'|Host='+match[0][2]+match[0][3])
+		elif match[0][1] == 'rtmp':
+			if useproxy == True:
+				url=match[0][1]+'://macedoniaondemand.com:1935/'+match[0][4]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
+			else:
+				url=match[0][1]+'://'+match[0][2]+match[0][3]+'/'+match[0][4]+' pageUrl='+url+' swfUrl=http://vjs.zencdn.net/swf/5.0.1/video-js.swf'
 			playurl(url)
 
 
@@ -1370,6 +1385,7 @@ def PROCESS_PAGE(page,url='',name=''):
 		addDir('zulu', 'live_zulumk_proxy', '', '')
 		if checkIsProxyEnabled():
 			addDir('maxtv', 'live_maxtv_proxy', '', '')
+		addDir('mrt', 'list_mrtlive_proxy', '', '')
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
@@ -1591,10 +1607,14 @@ def PROCESS_PAGE(page,url='',name=''):
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
-	elif page == 'list_mrtlive':
+	elif page == 'list_mrtlive' or page == 'list_mrtlive_proxy':
 		listing = list_mrtlive()
+		if page == 'list_mrtlive':
+			nextpage = 'play_mrt_video'
+		else:
+			nextpage = 'play_mrt_video_proxy'
 		for url,title,thumb in listing:
-			addLink(title, url, 'play_mrt_video', thumb)
+			addLink(title, url, nextpage, thumb)
 
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
@@ -1631,7 +1651,10 @@ def PROCESS_PAGE(page,url='',name=''):
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 	elif page == 'play_mrt_video':
-		playmrtvideo(url)
+		playmrtvideo(url, False)
+
+	elif page == 'play_mrt_video_proxy':
+		playmrtvideo(url, True)
 
 	elif page == 'hrt_front':
 		addLink('HRT1 Live', 'http://5323.live.streamtheworld.com/HTV1?streamtheworld_user=1&nobuf=1361039552824', '', 'http://upload.wikimedia.org/wikipedia/commons/1/1f/HRT1_Logo_aktuell.jpg')
