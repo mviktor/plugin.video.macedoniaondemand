@@ -1,3 +1,6 @@
+v2.4
+   - [mrt] fix for mrt and align with proxy version of the plugin
+
 v2.3
    - [tvnova] fix for tvnova.mk
 
