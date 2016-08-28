@@ -1,3 +1,6 @@
+v3.1
+   - support playing mrt via proxy
+
 v3.0
    - support for running via proxy
 
