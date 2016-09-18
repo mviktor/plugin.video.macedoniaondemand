@@ -557,9 +557,16 @@ def list_mrtcategories(url):
 
 	return [list, nextpage]
 
-def list_mrtlive():
-	url = 'http://play.mrt.com.mk/'
-	req = urllib2.Request(url)
+def list_mrtlive(useproxy):
+	if useproxy == True:
+		servername	= 'macedoniaondemand.com'
+		hostname	= 'play.mrt.com.mk'
+	else:
+		servername	= 'play.mrt.com.mk'
+		hostname	= 'play.mrt.com.mk'
+
+	req = urllib2.Request('http://'+servername+'/')
+	req.add_header('Host', hostname)
 	req.add_header('User-Agent', user_agent)
 	response = urllib2.urlopen(req)
 	link=response.read()
@@ -1607,17 +1614,25 @@ def PROCESS_PAGE(page,url='',name=''):
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
-	elif page == 'list_mrtlive' or page == 'list_mrtlive_proxy':
-		listing = list_mrtlive()
-		if page == 'list_mrtlive':
-			nextpage = 'play_mrt_video'
-		else:
-			nextpage = 'play_mrt_video_proxy'
+	elif page == 'list_mrtlive':
+		listing = list_mrtlive(False)
 		for url,title,thumb in listing:
-			addLink(title, url, nextpage, thumb)
+			addLink(title, url, 'play_mrt_video', thumb)
 
 		setView()
 		xbmcplugin.endOfDirectory(int(sys.argv[1]))
+
+	elif page == 'list_mrtlive_proxy':
+		if checkIsProxyEnabled() == False:
+			xbmcgui.Dialog().ok('Failed', 'Your account or IP address is not active in the proxy.',
+			'Visit http://macedoniaondemand.com from any device on same network to activate it.', 'No need to change any setting!')
+		else:
+			listing = list_mrtlive(True)
+			for url,title,thumb in listing:
+				addLink(title, url, 'play_mrt_video_proxy', thumb)
+
+			setView()
+			xbmcplugin.endOfDirectory(int(sys.argv[1]))
 
 	elif page == 'list_mrtcategories':
 		[listing, nextpage] = list_mrtcategories(url)
