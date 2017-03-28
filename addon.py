@@ -1125,10 +1125,8 @@ def prvatv_playvideo(url):
 	link = response.read()
 	response.close()
 
-	start = link.find('class="mediaDescription"')
-
-	titlematch=re.compile("title: '(.+?)'").findall(link[start:])
-	videourlmatch=re.compile('src: "(.+?)"').findall(link[start:])
+	titlematch=re.compile("title: '(.+?)'").findall(link)
+	videourlmatch=re.compile('src: ("|\')(.+?)("|\')').findall(link)
 
 	if titlematch != []:
 		name = titlematch[0]
@@ -1136,7 +1134,7 @@ def prvatv_playvideo(url):
 	if videourlmatch == []:
 		return False
 
-	videourl=videourlmatch[0]
+	videourl=videourlmatch[0][1]
 	if videourl[0] == '/':
 		videourl='http://'+url.split('/')[2]+videourl
 
