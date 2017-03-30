@@ -1,3 +1,8 @@
+v3.2
+   - Fix for Prva.RS
+   - Remove Zulu support - website does not exists anymore
+   - VIPTV support
+
 v3.1
    - support playing mrt via proxy
 
